@@ -9,9 +9,11 @@ Nginx插件开发需求
  
 ###描述
 
-业务系统请求Nginx服务器上的服务，地址如`http://IP:Port/Contextpath/flvplay?sysCheckNo=&documentId=&versionId=`， 其中，flvplay是Nginx服务器提供的请求服务。
+业务系统请求Nginx服务器上的服务，地址如
 
-开发flvplay请求服务，通过该服务解析相应的请求参数，封装请求参数成json串格式
+    http://IP:Port/Contextpath/flvplay?sysCheckNo=&documentId=&versionId=
+    
+其中，flvplay是Nginx服务器提供的请求服务。开发flvplay请求服务，通过该服务解析相应的请求参数，封装请求参数成json串格式
 
     {"sysCheckNo":"系统验证码","documentId":"文档ID","versionId":"版本ID"}
 
