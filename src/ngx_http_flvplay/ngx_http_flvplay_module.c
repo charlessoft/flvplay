@@ -7,9 +7,20 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
-
+#include "uds_filepath.h"
 
 static char *ngx_http_flvplay(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static void *ngx_http_flvplay_create_conf(ngx_conf_t *cf);
+static char *ngx_http_flvplay_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_http_uds_host(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_http_uds_port(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_http_uds_uri(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+typedef struct {
+    ngx_str_t  uds_host;
+    ngx_int_t  uds_port;
+    ngx_str_t  uds_uri;
+} ngx_http_flvplay_conf_t;
 
 static ngx_command_t  ngx_http_flvplay_commands[] = {
 
@@ -17,6 +28,27 @@ static ngx_command_t  ngx_http_flvplay_commands[] = {
       NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
       ngx_http_flvplay,
       0,
+      0,
+      NULL },
+
+    { ngx_string("uds_host"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_uds_host,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("uds_port"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_uds_port,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("uds_uri"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_uds_uri,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
@@ -37,8 +69,8 @@ static ngx_http_module_t  ngx_http_flvplay_module_ctx = {
     NULL,                          /* create server configuration */
     NULL,                          /* merge server configuration */
 
-    NULL,                          /* create location configuration */
-    NULL                           /* merge location configuration */
+    ngx_http_flvplay_create_conf,  /* create location configuration */
+    ngx_http_flvplay_merge_conf    /* merge location configuration */
 };
 
 
@@ -57,13 +89,107 @@ ngx_module_t  ngx_http_flvplay_module = {
     NGX_MODULE_V1_PADDING
 };
 
+ngx_int_t
+_ngx_http_flvplay_handler(ngx_http_request_t *r, ngx_str_t *p_path);
+
+extern ngx_int_t
+_ngx_http_mp4play_handler(ngx_http_request_t *r, ngx_str_t *p_path);
 
 static ngx_int_t
 ngx_http_flvplay_handler(ngx_http_request_t *r)
 {
-    u_char                    *last;
+    /*u_char                    *last;*/
+    /*size_t                     root;*/
+
+    /*off_t                      start, len;*/
+    /*ngx_int_t                  rc;*/
+    /*ngx_uint_t                 level, i;*/
+    /*ngx_str_t                  path, value;*/
+    /*ngx_log_t                 *log;*/
+    /*ngx_buf_t                 *b;*/
+    /*ngx_chain_t                out[2];*/
+    /*ngx_open_file_info_t       of;*/
+    /*ngx_http_core_loc_conf_t  *clcf;*/
+    /*ngx_http_flvplay_conf_t *frcf;*/
+
+
+
+    ngx_int_t                  rc;
+    ngx_log_t                 *log;
+    ngx_str_t                  path;
+    ngx_http_core_loc_conf_t  *clcf;
+    ngx_http_flvplay_conf_t *frcf;
+
+    /* ********************************************************* */
+    /*ngx_str_t host;*/
+    /*int port = 18086;*/
+    /*ngx_str_t uri;*/
+    
+    /*ngx_str_set(&host, "localhost");*/
+    /*ngx_str_set(&uri, "/miniuds");*/
+    /* ********************************************************* */
+
+    log = r->connection->log;
+
+    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
+        return NGX_HTTP_NOT_ALLOWED;
+    }
+
+
+    if (r->uri.data[r->uri.len - 1] == '/') {
+        return NGX_DECLINED;
+    }
+
+
+    rc = ngx_http_discard_request_body(r);
+
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    /* ********************************************************* */
+    /*last = ngx_http_map_uri_to_path(r, &path, &root, 0);*/
+    /*if (last == NULL) {*/
+        /*return NGX_HTTP_INTERNAL_SERVER_ERROR;*/
+    /*}*/
+    /*path.len = last - path.data;*/
+
+    /* --------------------------------------------------------- */
+
+    frcf = ngx_http_get_module_loc_conf(r, ngx_http_flvplay_module);
+    ngx_log_error(NGX_LOG_ERR, log, NGX_EACCES, "frcf host: %V port: %d uri: %V", &frcf->uds_host, frcf->uds_port, &frcf->uds_uri);
+    rc = get_flv_absolue_path(r, &frcf->uds_host, frcf->uds_port, &frcf->uds_uri, &r->args, &clcf->root, &path);
+    if ( rc != NGX_OK ) {
+        return rc;
+    }
+
+    /*return _ngx_http_flvplay_handler(r, &path);*/
+    if ( path.len >= 5 && 
+            path.data[path.len - 3] == 'f' &&
+            path.data[path.len - 2] == 'l' &&
+            path.data[path.len - 1] == 'v' ) {
+        return _ngx_http_flvplay_handler(r, &path);
+    } else if ( path.len >= 5 &&
+            path.data[path.len - 3] == 'm' &&
+            path.data[path.len - 2] == 'p' &&
+            path.data[path.len - 1] == '4' ) {
+        return _ngx_http_mp4play_handler(r, &path);
+    } else {
+        return NGX_DECLINED;
+    }
+
+    /* ********************************************************* */
+}
+
+ngx_int_t
+_ngx_http_flvplay_handler(ngx_http_request_t *r, ngx_str_t *p_path){
+
+    /*u_char                    *last;*/
+    /*size_t                     root;*/
+
     off_t                      start, len;
-    size_t                     root;
     ngx_int_t                  rc;
     ngx_uint_t                 level, i;
     ngx_str_t                  path, value;
@@ -72,30 +198,10 @@ ngx_http_flvplay_handler(ngx_http_request_t *r)
     ngx_chain_t                out[2];
     ngx_open_file_info_t       of;
     ngx_http_core_loc_conf_t  *clcf;
-
-    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
-        return NGX_HTTP_NOT_ALLOWED;
-    }
-
-    if (r->uri.data[r->uri.len - 1] == '/') {
-        return NGX_DECLINED;
-    }
-
-    rc = ngx_http_discard_request_body(r);
-
-    if (rc != NGX_OK) {
-        return rc;
-    }
-
-    last = ngx_http_map_uri_to_path(r, &path, &root, 0);
-    if (last == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
-
+    
     log = r->connection->log;
 
-    path.len = last - path.data;
-
+    path = *p_path;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
                    "http flv filename: \"%V\"", &path);
 
@@ -249,6 +355,111 @@ ngx_http_flvplay_handler(ngx_http_request_t *r)
     return ngx_http_output_filter(r, &out[i]);
 }
 
+
+static void *
+ngx_http_flvplay_create_conf(ngx_conf_t *cf)
+{
+    ngx_http_flvplay_conf_t  *conf;
+
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_flvplay_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
+
+    /*
+     * set by ngx_pcalloc():
+     *
+     *     conf->uds_host = { 0, NULL };
+     *     conf->uds_port = 0;
+     *     conf->uds_uri = { 0, NULL };
+     */
+
+    /*conf->vars = NGX_CONF_UNSET_PTR;*/
+
+    return conf;
+}
+
+
+static char *
+ngx_http_flvplay_merge_conf(ngx_conf_t *cf, void *parent, void *child)
+{
+    ngx_http_flvplay_conf_t *prev = parent;
+    ngx_http_flvplay_conf_t *conf = child;
+
+    ngx_conf_merge_str_value(conf->uds_host, prev->uds_host, "localhost");
+    if ( conf->uds_port == 0 ) {
+        if ( prev->uds_port > 0 ) {
+            conf->uds_port = prev->uds_port;
+        }
+    }
+    ngx_conf_merge_str_value(conf->uds_uri, prev->uds_uri, "");
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_http_uds_host(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_flvplay_conf_t *frcf = conf;
+
+    ngx_str_t        *value;
+
+    if (frcf->uds_host.data != NULL) {
+        return "uds_host is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        frcf->uds_host.len = 0;
+        frcf->uds_host.data = (u_char*)0;
+    } else 
+        frcf->uds_host = value[1];
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_uds_port(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_flvplay_conf_t *frcf = conf;
+
+    ngx_str_t        *value;
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        frcf->uds_port = 0;
+    } else
+        frcf->uds_port = atoi((const char*)value[1].data);
+        /*frcf->uds_port = value[1];*/
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_http_uds_uri(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_flvplay_conf_t *frcf = conf;
+
+    ngx_str_t        *value;
+
+    if (frcf->uds_uri.data != NULL) {
+        return "uds_uri is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        frcf->uds_uri.len = 0;
+        frcf->uds_uri.data = (u_char*)0;
+    } else
+        frcf->uds_uri = value[1];
+    
+
+    return NGX_CONF_OK;
+}
 
 static char *
 ngx_http_flvplay(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
