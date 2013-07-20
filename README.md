@@ -1,7 +1,7 @@
 flvplay
 =======
 
-An nginx plugin that play flv movies for UDS.
+An nginx plugin that play .flv .mp4 movies for UDS.
 
 添加关键帧：yamdi
 
