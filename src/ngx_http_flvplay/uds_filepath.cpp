@@ -11,9 +11,52 @@
 #include <fstream>
 #include <iostream>
 /*#include <syslog.h>*/
-
+#include <stdarg.h>
 using namespace boost::asio;
 
+extern "C" void FX_OUTPUT_LOG_FUNC(const char* format, ...)
+{
+    va_list argList;
+    va_start(argList, format);
+    FILE* file = fopen("/tmp/logfile.txt", "a+");
+    if (file == NULL) return;
+    vfprintf(file, format, argList);
+    fprintf(file, "\n");
+    fclose(file);
+    va_end(argList);
+
+}
+
+int GetSpecialWordsA( const char* lpstrSentence, const char* lpPrefix, const char* lpPostfix, char* lpDest, int nMaxSize )
+{
+    size_t nLength;
+    char *pPos, *pEnd;
+
+    pPos = (char*)strstr(lpstrSentence, lpPrefix);
+    if( pPos == NULL )
+    {
+        //strcpy_s(lpDest, nMaxSize, "");
+        strcpy(lpDest,"");
+        return 0;
+    }
+
+    pPos += strlen(lpPrefix);
+    while(*pPos == ' ')
+        pPos++;
+
+    pEnd = strstr(pPos, lpPostfix);
+    if( pEnd == NULL )
+        nLength = strlen(lpstrSentence) - strlen(lpPrefix);
+    else 
+        nLength = (int)(pEnd-pPos);
+
+    //strncpy_s(lpDest, nMaxSize, pPos,nLength);
+    strncpy(lpDest,pPos,nLength);
+
+
+    return (int)nLength;
+}
+        
 std::string get_uds_filepath_by_httpget(const std::string& host, int port, const std::string& uri, const std::string& getargs) {
     std::string filepath;
     //std::string filepath = "{\"success\":true,\"relative_path\":\"/media/spring.flv\"}";
@@ -39,10 +82,15 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
     //ip::tcp::endpoint endpoint(addr, port);
 
     // -----------------------------------------------
-
+    char szbuf[256] = {0};
+    getargs.copy(szbuf,getargs.length()-6);
+    FX_OUTPUT_LOG_FUNC("szbuf=%s",szbuf);
+    std::string strtmpargs = getargs;
+    FX_OUTPUT_LOG_FUNC("host=%s\n,port=%d\n,uri=%s\n,getargs=%s\n\n",host.c_str(),port,uri.c_str(),getargs.c_str());
     boost::system::error_code ec;
     sock.connect(endpoint, ec);
     if ( ec ) {
+        FX_OUTPUT_LOG_FUNC("Scok connect failure");
         std::cout << "Socket connect " << host << " failure!" << std::endl;
     } else {
         //boost::asio::streambuf request; 
@@ -55,12 +103,18 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
         //request_stream << "\r\n";
 
         std::stringstream ss;
+        //if ( !uri.empty() ){
+        //    ss << "GET " << uri << "?" << getargs << " HTTP/1.1\r\n"; 
+        //} else {
+        //    ss << "GET " << "?" << getargs << " HTTP/1.1\r\n";
+        //}
+
         if ( !uri.empty() ){
-            ss << "GET " << uri << "?" << getargs << " HTTP/1.1\r\n"; 
+            ss << "GET " << uri << "?" << szbuf << " \r\n"; 
         } else {
-            ss << "GET " << "?" << getargs << " HTTP/1.1\r\n";
+            ss << "GET " << "?" << szbuf << " \r\n";
         }
-        //ss << "User-agent: curl/7.27.0\r\n";
+        ss << "User-agent: curl/7.27.0\r\n";
         ss << "User-agent: flvplay/1.0.0\r\n";
         ss << "Host: " << host << ":" << port << "\r\n"; 
         ss << "Accept: */*\r\n"; 
@@ -71,6 +125,7 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
         //boost::asio::write(sock, request); 
         const std::string str = ss.str();
         const char* szRequest = str.c_str(); 
+        FX_OUTPUT_LOG_FUNC("szRequest=%s",szRequest);
         size_t nRequest = str.length();
         sock.send(buffer(szRequest, nRequest));
 
@@ -82,8 +137,12 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
             szResponse[nBytes] = 0;
         else
             szResponse[nResponse] = 0;
-
-        filepath = szResponse;
+        FX_OUTPUT_LOG_FUNC("szResponse=%s",szResponse);
+        char szJson[256] = {0};
+        GetSpecialWordsA(szResponse, "{","}",szJson,256);
+        /*filepath = szResponse;*/
+        filepath = filepath + "{" + szJson + "}";
+        FX_OUTPUT_LOG_FUNC("filepath=%s",filepath.c_str());
 
         //std::fstream f;
         //f.open("/tmp/flvplay.txt", std::ios::binary | std::ios::out | std::ios::trunc);
