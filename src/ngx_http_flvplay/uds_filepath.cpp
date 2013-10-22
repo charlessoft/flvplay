@@ -1,16 +1,16 @@
 
-/*#include <jsoncpp/json/json.h>*/
-#include <json/json.h>
+#include <jsoncpp/json/json.h>
+/*#include <json/json.h>*/
 
 #include <boost/asio.hpp>
-#include <netinet/in.h>
+/*#include <netinet/in.h>*/
 
 #include <cstdio>
 #include <string>
 #include <sstream>
 #include <fstream>
 #include <iostream>
-#include <syslog.h>
+/*#include <syslog.h>*/
 
 using namespace boost::asio;
 
@@ -261,44 +261,45 @@ extern "C" {
         std::string jsonstring = get_uds_filepath_by_httpget(host, port, uri, getargs);
 
         // ---------- jsoncpp ----------
-        //Json::Value root;
-        //Json::Reader reader;
+        Json::Value root;
+        Json::Reader reader;
 
-        //bool bSuccess;
-        //std::string relative_path;
-        //std::string error_info;
+        bool bSuccess;
+        std::string relative_path;
+        std::string error_info;
 
-        //*filepath = NULL;
+        *filepath = NULL;
 
-        //bool bOK = reader.parse(jsonstring, root);
-        //if ( bOK ){
-            //bSuccess = root.get("success", false).asBool();
-            //if ( bSuccess ) {
-                //relative_path = root.get("relative_path", "").asString();
-                //size_t len = relative_path.length();
-                //*filepath = new char[len];
-                //memcpy(*filepath, relative_path.c_str(), len);
-                //last = *filepath + len;
-            //} else {
-                //error_info = root.get("error_info", "").asString();
-            //}
-        //}
-        // ---------- json-c ----------
-        struct json_object *root = json_tokener_parse(jsonstring.c_str());
-        if ( root != NULL ) {
-            struct json_object *objSuccess = json_object_object_get(root, "success");
-            if ( json_object_get_boolean(objSuccess) ) {
-                struct json_object *objRelativePath = json_object_object_get(root, "relative_path");
-                std::string relative_path = json_object_get_string(objRelativePath);
+        bool bOK = reader.parse(jsonstring, root);
+        if ( bOK ){
+            bSuccess = root.get("success", false).asBool();
+            if ( bSuccess ) {
+                relative_path = root.get("relative_path", "").asString();
                 size_t len = relative_path.length();
                 *filepath = new char[len];
                 memcpy(*filepath, relative_path.c_str(), len);
                 last = *filepath + len;
-            } else {
-                struct json_object *objErrorInfo = json_object_object_get(root, "error_info");
-                std::string error_info = json_object_get_string(objErrorInfo);
+           } else {
+                error_info = root.get("error_info", "").asString();
             }
         }
+         
+        // ---------- json-c ----------
+        //struct json_object *root = json_tokener_parse(jsonstring.c_str());
+        //if ( root != NULL ) {
+        //    struct json_object *objSuccess = json_object_object_get(root, "success");
+        //    if ( json_object_get_boolean(objSuccess) ) {
+        //        struct json_object *objRelativePath = json_object_object_get(root, "relative_path");
+        //        std::string relative_path = json_object_get_string(objRelativePath);
+        //        size_t len = relative_path.length();
+        //        *filepath = new char[len];
+        //        memcpy(*filepath, relative_path.c_str(), len);
+        //        last = *filepath + len;
+        //    } else {
+        //        struct json_object *objErrorInfo = json_object_object_get(root, "error_info");
+        //        std::string error_info = json_object_get_string(objErrorInfo);
+        //    }
+        //}
 
         return last;
     }

@@ -172,16 +172,17 @@ ngx_http_flvplay_handler(ngx_http_request_t *r)
             return rc;
         }
     } else {
+        ngx_str_t relative_path;
+        u_char* last_path ;
         int filepathlen = r->uri.len - 11;
         u_char* filepath;
         filepath = ngx_palloc(r->pool, filepathlen);
         ngx_cpystrn(filepath, &r->uri.data[12], filepathlen);
-        ngx_str_t relative_path;
         relative_path.data = filepath;
         relative_path.len = filepathlen;
 
         path.len = clcf->root.len + relative_path.len;
-        u_char* last_path = ngx_sprintf(path.data, "%V%V", &clcf->root, &relative_path);
+        last_path = ngx_sprintf(path.data, "%V%V", &clcf->root, &relative_path);
         if ( last_path == NULL ){
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -221,6 +222,7 @@ _ngx_http_other_handler(ngx_http_request_t *r, ngx_str_t *p_path){
     ngx_open_file_info_t       of;
     ngx_http_core_loc_conf_t  *clcf;
     
+    int isHtml = 0;
     log = r->connection->log;
 
     path = *p_path;
@@ -322,7 +324,6 @@ _ngx_http_other_handler(ngx_http_request_t *r, ngx_str_t *p_path){
     r->headers_out.content_length_n = len;
     r->headers_out.last_modified_time = of.mtime;
 
-    int isHtml = 0;
     if ( path.len >= 6 && 
             path.data[path.len - 4] == 'h' &&
             path.data[path.len - 3] == 't' &&
