@@ -18,7 +18,7 @@ extern "C" void FX_OUTPUT_LOG_FUNC(const char* format, ...)
 {
     va_list argList;
     va_start(argList, format);
-    FILE* file = fopen("/tmp/logfile.txt", "a+");
+    FILE* file = fopen("c:/logfile.txt", "a+");
     if (file == NULL) return;
     vfprintf(file, format, argList);
     fprintf(file, "\n");
