@@ -12,6 +12,7 @@
 #include <iostream>
 /*#include <syslog.h>*/
 #include <stdarg.h>
+#include "CService.h"
 using namespace boost::asio;
 
 extern "C" void FX_OUTPUT_LOG_FUNC(const char* format, ...)
@@ -56,8 +57,27 @@ int GetSpecialWordsA( const char* lpstrSentence, const char* lpPrefix, const cha
 
     return (int)nLength;
 }
-        
+std::string get_uds_filepath_by_curl(const std::string& host, int port, const std::string& uri, const std::string& getargs)
+{
+
+        std::stringstream ss;
+        ss << "http://" << host.c_str() << ":" << port << uri.c_str() << "?" << getargs.c_str(); 
+//    	string strurl="http://10.142.51.171:7002/media/media-file-play/0/play?sysCheckNo=3452B1CFFA4080468AF1A64DF7C66255&documentid=090f1b318013f255&versionid=090f1b318013f255_0&type=nginx";
+        string strurl = ss.str();
+        strurl = strurl.substr(0,strurl.length() - strlen("HTTP/1.1\r\nHost"));
+        FX_OUTPUT_LOG_FUNC("url = %s",strurl.c_str());
+        Service CService;
+        int nRes = CService.HttpRequest("GET",strurl);
+        printf("nRes = %d",nRes);
+        string strbuf =	CService.m_resp_buffer;
+        string strresp = CService.m_resp_header;
+        FX_OUTPUT_LOG_FUNC("buf=%s",strbuf.c_str());
+        FX_OUTPUT_LOG_FUNC("resp=%s",strresp.c_str());
+        return  strbuf;  
+}
+
 std::string get_uds_filepath_by_httpget(const std::string& host, int port, const std::string& uri, const std::string& getargs) {
+    return get_uds_filepath_by_curl( host, port, uri, getargs);
     std::string filepath;
     //std::string filepath = "{\"success\":true,\"relative_path\":\"/media/spring.flv\"}";
     //std::string filepath = "{\"success\":false,\"error_info\":\"UDS get filepath 错误信息\"}";
@@ -77,20 +97,16 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
     ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query, ec_resolve);
     ip::tcp::endpoint endpoint = *endpoint_iterator;
     // -----------------------------------------------
-
+FX_OUTPUT_LOG_FUNC("xxx=%s://%d/%s?%s",host.c_str(),port,uri.c_str(),getargs.c_str());
     //ip::address addr = ip::address::from_string("127.0.0.1");
     //ip::tcp::endpoint endpoint(addr, port);
 
     // -----------------------------------------------
-    char szbuf[256] = {0};
-    getargs.copy(szbuf,getargs.length()-6);
-    FX_OUTPUT_LOG_FUNC("szbuf=%s",szbuf);
-    std::string strtmpargs = getargs;
-    FX_OUTPUT_LOG_FUNC("host=%s\n,port=%d\n,uri=%s\n,getargs=%s\n\n",host.c_str(),port,uri.c_str(),getargs.c_str());
+
     boost::system::error_code ec;
     sock.connect(endpoint, ec);
     if ( ec ) {
-        FX_OUTPUT_LOG_FUNC("Scok connect failure");
+        FX_OUTPUT_LOG_FUNC("socket connect failture");
         std::cout << "Socket connect " << host << " failure!" << std::endl;
     } else {
         //boost::asio::streambuf request; 
@@ -103,18 +119,12 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
         //request_stream << "\r\n";
 
         std::stringstream ss;
-        //if ( !uri.empty() ){
-        //    ss << "GET " << uri << "?" << getargs << " HTTP/1.1\r\n"; 
-        //} else {
-        //    ss << "GET " << "?" << getargs << " HTTP/1.1\r\n";
-        //}
-
         if ( !uri.empty() ){
-            ss << "GET " << uri << "?" << szbuf << " \r\n"; 
+            ss << "GET " << uri << "?" << getargs << " HTTP/1.1\r\n"; 
         } else {
-            ss << "GET " << "?" << szbuf << " \r\n";
+            ss << "GET " << "?" << getargs << " HTTP/1.1\r\n";
         }
-        ss << "User-agent: curl/7.27.0\r\n";
+        //ss << "User-agent: curl/7.27.0\r\n";
         ss << "User-agent: flvplay/1.0.0\r\n";
         ss << "Host: " << host << ":" << port << "\r\n"; 
         ss << "Accept: */*\r\n"; 
@@ -137,12 +147,9 @@ std::string get_uds_filepath_by_httpget(const std::string& host, int port, const
             szResponse[nBytes] = 0;
         else
             szResponse[nResponse] = 0;
+
         FX_OUTPUT_LOG_FUNC("szResponse=%s",szResponse);
-        char szJson[256] = {0};
-        GetSpecialWordsA(szResponse, "{","}",szJson,256);
-        /*filepath = szResponse;*/
-        filepath = filepath + "{" + szJson + "}";
-        FX_OUTPUT_LOG_FUNC("filepath=%s",filepath.c_str());
+        filepath = szResponse;
 
         //std::fstream f;
         //f.open("/tmp/flvplay.txt", std::ios::binary | std::ios::out | std::ios::trunc);
@@ -333,7 +340,7 @@ extern "C" {
         if ( bOK ){
             bSuccess = root.get("success", false).asBool();
             if ( bSuccess ) {
-                relative_path = root.get("relative_path", "").asString();
+                relative_path = root.get("media_relative_path", "").asString();
                 size_t len = relative_path.length();
                 *filepath = new char[len];
                 memcpy(*filepath, relative_path.c_str(), len);
