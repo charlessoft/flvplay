@@ -61,10 +61,14 @@ std::string get_uds_filepath_by_curl(const std::string& host, int port, const st
 {
 
         std::stringstream ss;
+        string strurl;
+        string strurltmp;
         ss << "http://" << host.c_str() << ":" << port << uri.c_str() << "?" << getargs.c_str(); 
 //    	string strurl="http://10.142.51.171:7002/media/media-file-play/0/play?sysCheckNo=3452B1CFFA4080468AF1A64DF7C66255&documentid=090f1b318013f255&versionid=090f1b318013f255_0&type=nginx";
-        string strurl = ss.str();
-        strurl = strurl.substr(0,strurl.length() - strlen("HTTP/1.1\r\nHost"));
+        strurltmp = ss.str();
+        int npos = strurltmp.find("HTTP",0);
+        strurl = strurltmp.substr(0,npos);
+        //strurltmp = strurl.substr(0,strurl.length() - strlen("HTTP/1.1\r\nHost"));
         FX_OUTPUT_LOG_FUNC("url = %s",strurl.c_str());
         Service CService;
         int nRes = CService.HttpRequest("GET",strurl);
